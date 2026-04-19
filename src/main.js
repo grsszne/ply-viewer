@@ -1,6 +1,6 @@
 import * as THREE from "https://esm.sh/three@0.181.1";
-import { OrbitControls } from "https://esm.sh/three@0.181.1/examples/jsm/controls/OrbitControls.js";
 import { PLYLoader } from "https://esm.sh/three@0.181.1/examples/jsm/loaders/PLYLoader.js";
+import { TrackballControls } from "https://esm.sh/three@0.181.1/examples/jsm/controls/TrackballControls.js";
 
 const state = {
   cloud: null,
@@ -11,6 +11,16 @@ const state = {
   background: "dark",
   activeFileName: null,
 };
+
+const pressedKeys = new Set();
+const worldUp = new THREE.Vector3(0, 1, 0);
+const cameraOffset = new THREE.Vector3();
+const cameraForward = new THREE.Vector3();
+const cameraRight = new THREE.Vector3();
+const cameraPlanarForward = new THREE.Vector3();
+const cameraPlanarRight = new THREE.Vector3();
+const translationStep = new THREE.Vector3();
+const spherical = new THREE.Spherical();
 
 const viewport = document.querySelector("#viewport");
 const statusEl = document.querySelector("#status");
@@ -44,11 +54,12 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 viewport.appendChild(renderer.domElement);
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.screenSpacePanning = true;
-controls.zoomSpeed = 0.85;
+const controls = new TrackballControls(camera, renderer.domElement);
+controls.rotateSpeed = 4.2;
+controls.zoomSpeed = 1.15;
+controls.panSpeed = 0.9;
+controls.dynamicDampingFactor = 0.12;
+controls.noRoll = true;
 controls.target.set(0, 0, 0);
 
 const grid = new THREE.GridHelper(10, 20, 0x56483c, 0x2d2621);
@@ -83,6 +94,7 @@ placeholder.add(placeholderSphere, placeholderRing);
 scene.add(placeholder);
 
 const loader = new PLYLoader();
+const clock = new THREE.Clock();
 
 const numberFormatter = new Intl.NumberFormat("en-US");
 
@@ -104,6 +116,7 @@ function resize() {
   camera.aspect = clientWidth / clientHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(clientWidth, clientHeight, false);
+  controls.handleResize();
   if (state.cloud) {
     state.cloud.material.uniforms.uViewportHeight.value = clientHeight;
   }
@@ -271,6 +284,120 @@ function fitCameraToSphere(sphere) {
   controls.update();
 }
 
+function getSceneScale() {
+  return Math.max(state.cloud?.geometry?.boundingSphere?.radius ?? 1, 0.01);
+}
+
+function getTranslationSpeed() {
+  const distance = camera.position.distanceTo(controls.target);
+  return Math.max(getSceneScale() * 0.35, distance * 0.8);
+}
+
+function panScene(offset) {
+  camera.position.add(offset);
+  controls.target.add(offset);
+}
+
+function rotateAroundTarget(deltaYaw, deltaPitch) {
+  cameraOffset.subVectors(camera.position, controls.target);
+  spherical.setFromVector3(cameraOffset);
+
+  spherical.theta -= deltaYaw;
+  spherical.phi = THREE.MathUtils.clamp(
+    spherical.phi - deltaPitch,
+    0.04,
+    Math.PI - 0.04,
+  );
+
+  cameraOffset.setFromSpherical(spherical);
+  camera.position.copy(controls.target).add(cameraOffset);
+  camera.lookAt(controls.target);
+}
+
+function shouldIgnoreKeyEvent(event) {
+  const tagName = event.target?.tagName;
+  return (
+    event.metaKey ||
+    event.ctrlKey ||
+    event.altKey ||
+    tagName === "INPUT" ||
+    tagName === "TEXTAREA" ||
+    tagName === "SELECT" ||
+    tagName === "BUTTON"
+  );
+}
+
+function updateKeyboardNavigation(deltaSeconds) {
+  if (!pressedKeys.size) {
+    return;
+  }
+
+  const moveAmount = getTranslationSpeed() * deltaSeconds;
+  const rotateAmount = 1.4 * deltaSeconds;
+
+  camera.getWorldDirection(cameraForward);
+  cameraPlanarForward.copy(cameraForward).projectOnPlane(worldUp);
+  if (cameraPlanarForward.lengthSq() < 1e-6) {
+    cameraPlanarForward.set(0, 0, -1);
+  } else {
+    cameraPlanarForward.normalize();
+  }
+
+  cameraRight.crossVectors(cameraPlanarForward, worldUp);
+  if (cameraRight.lengthSq() < 1e-6) {
+    cameraRight.set(1, 0, 0);
+  } else {
+    cameraRight.normalize();
+  }
+  cameraPlanarRight.copy(cameraRight);
+
+  translationStep.set(0, 0, 0);
+
+  if (pressedKeys.has("w")) {
+    translationStep.add(cameraPlanarForward);
+  }
+  if (pressedKeys.has("s")) {
+    translationStep.sub(cameraPlanarForward);
+  }
+  if (pressedKeys.has("d")) {
+    translationStep.add(cameraPlanarRight);
+  }
+  if (pressedKeys.has("a")) {
+    translationStep.sub(cameraPlanarRight);
+  }
+  if (pressedKeys.has("r")) {
+    translationStep.add(worldUp);
+  }
+  if (pressedKeys.has("f")) {
+    translationStep.sub(worldUp);
+  }
+
+  if (translationStep.lengthSq() > 0) {
+    translationStep.normalize().multiplyScalar(moveAmount);
+    panScene(translationStep);
+  }
+
+  let yaw = 0;
+  let pitch = 0;
+
+  if (pressedKeys.has("q")) {
+    yaw += rotateAmount;
+  }
+  if (pressedKeys.has("e")) {
+    yaw -= rotateAmount;
+  }
+  if (pressedKeys.has("t")) {
+    pitch += rotateAmount;
+  }
+  if (pressedKeys.has("g")) {
+    pitch -= rotateAmount;
+  }
+
+  if (yaw !== 0 || pitch !== 0) {
+    rotateAroundTarget(yaw, pitch);
+  }
+}
+
 function updateMaterialRadius() {
   if (!state.cloud) {
     return;
@@ -338,7 +465,9 @@ async function readUrl(url) {
 
 function animate() {
   requestAnimationFrame(animate);
+  const deltaSeconds = Math.min(clock.getDelta(), 0.05);
   placeholder.rotation.y += 0.003;
+  updateKeyboardNavigation(deltaSeconds);
   controls.update();
   renderer.render(scene, camera);
 }
@@ -427,9 +556,29 @@ themeToggle.addEventListener("change", (event) => {
 
 window.addEventListener("resize", resize);
 window.addEventListener("keydown", (event) => {
-  if (event.key.toLowerCase() === "f" && state.cloud?.geometry.boundingSphere) {
-    fitCameraToSphere(state.cloud.geometry.boundingSphere);
+  if (shouldIgnoreKeyEvent(event)) {
+    return;
   }
+
+  const key = event.key.toLowerCase();
+  if (["w", "a", "s", "d", "q", "e", "r", "f", "t", "g"].includes(key)) {
+    pressedKeys.add(key);
+    event.preventDefault();
+    return;
+  }
+
+  if (key === "x" && state.cloud?.geometry.boundingSphere) {
+    fitCameraToSphere(state.cloud.geometry.boundingSphere);
+    event.preventDefault();
+  }
+});
+
+window.addEventListener("keyup", (event) => {
+  pressedKeys.delete(event.key.toLowerCase());
+});
+
+window.addEventListener("blur", () => {
+  pressedKeys.clear();
 });
 
 const searchParams = new URLSearchParams(window.location.search);
