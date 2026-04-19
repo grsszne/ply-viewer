@@ -1,8 +1,6 @@
-import "./style.css";
-
-import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { PLYLoader } from "three/examples/jsm/loaders/PLYLoader.js";
+import * as THREE from "https://esm.sh/three@0.181.1";
+import { OrbitControls } from "https://esm.sh/three@0.181.1/examples/jsm/controls/OrbitControls.js";
+import { PLYLoader } from "https://esm.sh/three@0.181.1/examples/jsm/loaders/PLYLoader.js";
 
 const state = {
   cloud: null,
