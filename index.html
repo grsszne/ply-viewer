@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>PLY Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="panel">
+        <div class="panel__header">
+          <p class="eyebrow">Static GH Pages Viewer</p>
+          <h1>PLY Viewer</h1>
+          <p class="lede">
+            Proper zoomable splats instead of fixed-pixel dots.
+          </p>
+        </div>
+
+        <div class="panel__section">
+          <div
+            class="dropzone"
+            id="dropzone"
+            role="button"
+            tabindex="0"
+            aria-label="Drop a PLY file or click to browse"
+          >
+            <span>Drop a <code>.ply</code> here</span>
+            <span class="dropzone__subtext">or click to browse</span>
+          </div>
+          <input id="file-input" type="file" accept=".ply" hidden />
+          <div class="button-row">
+            <button id="browse-button" class="button button--primary" type="button">
+              Open File
+            </button>
+            <button id="reset-view-button" class="button" type="button">
+              Reset View
+            </button>
+          </div>
+        </div>
+
+        <div class="panel__section controls">
+          <label class="control">
+            <span>Radius Multiplier</span>
+            <input
+              id="radius-slider"
+              type="range"
+              min="0.2"
+              max="4"
+              step="0.05"
+              value="1"
+            />
+            <output id="radius-output">1.00x</output>
+          </label>
+
+          <label class="control">
+            <span>Minimum Pixel Size</span>
+            <input
+              id="min-size-slider"
+              type="range"
+              min="1"
+              max="12"
+              step="0.5"
+              value="2"
+            />
+            <output id="min-size-output">2.0 px</output>
+          </label>
+
+          <label class="control">
+            <span>Maximum Pixel Size</span>
+            <input
+              id="max-size-slider"
+              type="range"
+              min="16"
+              max="160"
+              step="1"
+              value="72"
+            />
+            <output id="max-size-output">72 px</output>
+          </label>
+
+          <label class="control control--inline">
+            <span>Dark Background</span>
+            <input id="theme-toggle" type="checkbox" checked />
+          </label>
+        </div>
+
+        <div class="panel__section">
+          <p class="status" id="status">Waiting for a PLY file.</p>
+          <dl class="stats" id="stats">
+            <div>
+              <dt>File</dt>
+              <dd id="stat-file">-</dd>
+            </div>
+            <div>
+              <dt>Points</dt>
+              <dd id="stat-points">-</dd>
+            </div>
+            <div>
+              <dt>Bounds</dt>
+              <dd id="stat-bounds">-</dd>
+            </div>
+            <div>
+              <dt>Auto Radius</dt>
+              <dd id="stat-radius">-</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="panel__footer">
+          <p><kbd>Left drag</kbd> orbit</p>
+          <p><kbd>Right drag</kbd> pan</p>
+          <p><kbd>Wheel</kbd> dolly</p>
+          <p><kbd>F</kbd> fit scene</p>
+        </div>
+      </aside>
+
+      <main class="viewer-shell">
+        <div class="viewport" id="viewport"></div>
+        <div class="viewer-overlay">
+          <div class="viewer-overlay__pill">World-scale circular splats</div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
